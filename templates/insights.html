@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Insights</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <a href="/">Add Expense</a>
+        <a href="/expenses">View Expenses</a>
+        <a href="/insights" class="active">Insights</a>
+    </nav>
+
+    <h1>Spending by Category</h1>
+    <p><strong>Total spent:</strong> ${{ total }}</p>
+
+    <table>
+        <tr>
+            <th>Category</th>
+            <th>Total Spent</th>
+        </tr>
+        {% for row in spending %}
+        <tr>
+            <td>{{ row[0] }}</td>
+            <td>${{ row[1] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <h2>AI Suggestions</h2>
+    <div class="ai-box">
+        {{ ai_suggestions }}
+    </div>
+</body>
+</html>
