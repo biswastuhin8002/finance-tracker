@@ -1,16 +1,19 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+print("DB host:", os.environ["DATABASE_URL"].split("@")[-1])
+
 from flask import Flask, render_template, request, redirect
 import psycopg2
+from google import genai
+
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 app = Flask(__name__)
 
 def get_connection():
-    return psycopg2.connect(
-        host="localhost",
-        database="finance_tracker",
-        user="postgres",
-        password="Tuhin@2008",
-        port="5432"
-    )
+    return psycopg2.connect(os.environ["DATABASE_URL"])
 
 @app.route("/")
 def home():
@@ -56,8 +59,6 @@ def view_expenses():
     conn.close()
     return render_template("view_expenses.html", expenses=expenses)
 
-import ollama
-
 @app.route("/insights")
 def insights():
     conn = get_connection()
@@ -77,20 +78,34 @@ def insights():
     cur.close()
     conn.close()
 
-    # Build a plain-text summary to feed the LLM
-    summary_lines = [f"{name}: ${total}" for name, total in spending_by_category]
-    summary_text = f"Total spending: ${total_spent}\n" + "\n".join(summary_lines)
+    if not spending_by_category:
+        ai_suggestions = "Add some expenses first, then check back for suggestions."
+    else:
+        summary_lines = [f"{name}: ${total}" for name, total in spending_by_category]
+        summary_text = f"Total spending: ${total_spent}\n" + "\n".join(summary_lines)
 
-    prompt = f"""You are a personal finance assistant. Here is a breakdown of someone's spending by category:
+        prompt = f"""You are a personal finance assistant. Here is a breakdown of someone's spending by category:
 
 {summary_text}
 
 Give 3 short, practical suggestions on how they could save money, based on this data. Be specific about which categories stand out. Keep it concise."""
 
-    response = ollama.chat(model='llama3.2:3b', messages=[{'role': 'user', 'content': prompt}])
-    ai_suggestions = response['message']['content']
+        try:
+            response = client.models.generate_content(
+                model="gemini-3.8-flash",
+                contents=prompt
+            )
+            ai_suggestions = response.text
+        except Exception as e:
+            ai_suggestions = "AI suggestions are unavailable right now."
+            print("Gemini error:", e)
 
-    return render_template("insights.html", spending=spending_by_category, total=total_spent, ai_suggestions=ai_suggestions)
+    return render_template(
+        "insights.html",
+        spending=spending_by_category,
+        total=total_spent or 0,
+        ai_suggestions=ai_suggestions
+    )
 
 @app.route("/delete/<int:transaction_id>", methods=["POST"])
 def delete_expense(transaction_id):
